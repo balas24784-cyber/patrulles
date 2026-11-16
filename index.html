@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="ca">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Patrulles Balastegui">
+<meta name="mobile-web-app-capable" content="yes">
+<title>Patrulles - Sargento Balastegui</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+html, body { height: 100%; overflow: hidden; font-family: -apple-system, Arial, sans-serif; background: #f0f0f0; }
+
+/* HEADER */
+#header {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 500;
+  background: #185FA5; color: #fff;
+  padding: env(safe-area-inset-top, 0px) 0 0 0;
+}
+#header-inner {
+  display: flex; align-items: center; gap: 8px;
+  padding: 10px 12px 8px;
+}
+#header-title { font-size: 13px; font-weight: bold; flex: 1; line-height: 1.3; }
+#header-title span { display: block; font-size: 11px; font-weight: normal; opacity: 0.85; }
+
+/* STATUS */
+#status {
+  background: #eef4ff; color: #185FA5; font-size: 12px;
+  padding: 5px 12px; border-bottom: 1px solid #d0e0f5;
+  position: fixed; z-index: 499;
+  left: 0; right: 0;
+}
+
+/* MAP */
+#map {
+  position: fixed; left: 0; right: 0; bottom: 0;
+}
+
+/* BOTTOM PANEL */
+#bottom-panel {
+  position: fixed; bottom: 0; left: 0; right: 0; z-index: 500;
+  background: #fff; border-top: 1px solid #ddd;
+  padding: 8px 12px;
+  padding-bottom: env(safe-area-inset-bottom, 8px);
+  box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
+}
+#input-row {
+  display: flex; gap: 6px; align-items: center; margin-bottom: 7px;
+}
+#patrol-name {
+  flex: 1; padding: 9px 10px; border: 1.5px solid #ccc; border-radius: 8px;
+  font-size: 14px; min-width: 0;
+}
+#patrol-name:focus { outline: none; border-color: #185FA5; }
+#patrol-type {
+  padding: 9px 6px; border: 1.5px solid #ccc; border-radius: 8px;
+  font-size: 13px; background: #fff;
+}
+#btn-row { display: flex; gap: 6px; }
+.btn {
+  flex: 1; padding: 10px 6px; border-radius: 8px; font-size: 13px;
+  font-weight: bold; cursor: pointer; border: none; text-align: center;
+  -webkit-appearance: none;
+}
+#btn-add { background: #185FA5; color: #fff; }
+#btn-add.active { background: #e65c00; }
+#btn-move { background: #3B6D11; color: #fff; }
+#btn-move.active { background: #e65c00; }
+#btn-clear { background: #f5f5f5; color: #c00; border: 1px solid #e0b0b0; flex: 0 0 auto; padding: 10px 14px; }
+
+/* PATROL TAGS */
+#tags-row {
+  display: flex; gap: 5px; flex-wrap: wrap; margin-top: 6px;
+}
+.patrol-tag {
+  display: inline-flex; align-items: center; padding: 4px 10px;
+  border-radius: 20px; border: 1px solid #ccc; cursor: pointer;
+  background: #f0f0f0; font-size: 11px; color: #333;
+  -webkit-tap-highlight-color: transparent;
+}
+.patrol-tag:active { background: #dde8ff; }
+
+/* AUTHOR */
+#author-bar {
+  font-size: 10px; color: #888; text-align: center;
+  margin-top: 5px; padding-top: 4px; border-top: 1px solid #eee;
+}
+
+/* MODAL */
+#modal-overlay {
+  display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5);
+  z-index: 2000; align-items: flex-end; justify-content: center;
+}
+#modal-overlay.visible { display: flex; }
+#modal {
+  background: #fff; border-radius: 16px 16px 0 0;
+  padding: 20px 20px;
+  padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 20px);
+  width: 100%; max-width: 560px;
+  box-shadow: 0 -4px 20px rgba(0,0,0,0.2);
+  max-height: 80vh; overflow-y: auto;
+}
+#modal-handle {
+  width: 40px; height: 4px; background: #ddd; border-radius: 2px;
+  margin: 0 auto 16px;
+}
+#modal h3 { font-size: 16px; margin-bottom: 2px; color: #222; }
+#modal .subtitle { font-size: 12px; color: #888; margin-bottom: 12px; }
+#modal textarea {
+  width: 100%; height: 150px; border: 1.5px solid #ccc; border-radius: 8px;
+  padding: 10px; font-size: 14px; resize: none;
+  font-family: -apple-system, Arial, sans-serif; line-height: 1.6;
+  -webkit-appearance: none;
+}
+#modal textarea:focus { outline: none; border-color: #185FA5; }
+.modal-actions { display: flex; gap: 8px; margin-top: 12px; }
+.modal-actions button {
+  flex: 1; padding: 12px 6px; border-radius: 8px; font-size: 14px;
+  font-weight: bold; cursor: pointer; border: none; -webkit-appearance: none;
+}
+#btn-save-notes { background: #185FA5; color: #fff; }
+#btn-cancel-modal { background: #f0f0f0; color: #444; }
+#btn-delete-patrol { background: #fff0f0; color: #c00; border: 1px solid #e0b0b0 !important; flex: 0 0 auto; padding: 12px 14px; }
+
+/* LOCALITZADOR GPS (estil Google Maps) */
+.gps-ctl a { width:34px; height:34px; line-height:34px; font-size:20px; text-align:center; display:block; color:#555; background:#fff; text-decoration:none; }
+.gps-ctl a.on { color:#1a73e8; }
+.gps-ctl a.follow { color:#fff; background:#1a73e8; }
+.me-wrap { position:relative; width:120px; height:120px; pointer-events:none; }
+.me-beam { position:absolute; left:0; top:0; width:120px; height:120px; display:none; transition:transform .25s linear; }
+.me-dot { position:absolute; left:50%; top:50%; width:20px; height:20px; margin:-10px 0 0 -10px; border-radius:50%;
+  background:#1a73e8; border:3px solid #fff; box-shadow:0 1px 6px rgba(0,0,0,.45); }
+.me-dot.stale { background:#9aa0a6; }
+</style>
+</head>
+<body>
+
+<div id="header">
+  <div id="header-inner">
+    <div id="header-title">
+      Mapa de Patrulles · Sargento Balastegui
+      <span>GUB · Unitat Territorial Sant Martí</span>
+    </div>
+  </div>
+</div>
+
+<div id="status" style="top:0;">Carregant mapa...</div>
+
+<div id="map"></div>
+
+<div id="bottom-panel">
+  <div id="input-row">
+    <input type="text" id="patrol-name" placeholder="Indicativo (ej. EK191)" maxlength="20" autocomplete="off" autocorrect="off" />
+    <select id="patrol-type">
+      <option value="peu">? Peu</option>
+      <option value="vehicle">? Vehicle</option>
+      <option value="moto">? Moto</option>
+      <option value="paisa">? Paisà</option>
+    </select>
+  </div>
+  <div id="btn-row">
+    <button class="btn" id="btn-add" onclick="activateAdd()">+ Afegir</button>
+    <button class="btn" id="btn-move" onclick="activateMove()">? Editar</button>
+    <button class="btn" id="btn-clear" onclick="clearAll()">?</button>
+  </div>
+  <div id="tags-row"><span style="color:#bbb;font-size:11px;">Cap patrulla activa</span></div>
+  <div id="author-bar">Sargento Francisco González Balastegui · Basada en l'app del caporal A. Moya de Pablos</div>
+</div>
+
+<div id="modal-overlay" onclick="closeModalOutside(event)">
+  <div id="modal">
+    <div id="modal-handle"></div>
+    <h3 id="modal-title"></h3>
+    <div class="subtitle" id="modal-subtitle"></div>
+    <textarea id="modal-notes" placeholder="Pròxims punts, tasques, observacions...&#10;&#10;Exemple:&#10;- 18:00 Ronda mercat&#10;- 19:30 C/ Pallars cantonada Rambla&#10;- Reforç metro Clot"></textarea>
+    <div class="modal-actions">
+      <button class="btn" id="btn-delete-patrol" onclick="deleteFromModal()">? Eliminar</button>
+      <button class="btn" id="btn-cancel-modal" onclick="closeModal()">Cancel·lar</button>
+      <button class="btn" id="btn-save-notes" onclick="saveNotes()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const COLORS = { peu: '#185FA5', vehicle: '#3B6D11', moto: '#BA7517', paisa: '#993556' };
+const EMOJIS = { peu: '?', vehicle: '?', moto: '?', paisa: '?' };
+
+// Calcular alturas dinámicamente
+function getHeaderH() { return document.getElementById('header').offsetHeight; }
+function getStatusH() { return document.getElementById('status').offsetHeight; }
+function getBottomH() { return document.getElementById('bottom-panel').offsetHeight; }
+
+function resizeMap() {
+  const hh = getHeaderH();
+  const sh = getStatusH();
+  const bh = getBottomH();
+  const mapEl = document.getElementById('map');
+  mapEl.style.top = (hh + sh) + 'px';
+  mapEl.style.height = (window.innerHeight - hh - sh - bh) + 'px';
+  document.getElementById('status').style.top = hh + 'px';
+  if (window._map) window._map.invalidateSize();
+}
+
+window.addEventListener('resize', resizeMap);
+
+const map = L.map('map', { zoomControl: false }).setView([41.4065, 2.2020], 14);
+window._map = map;
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  attribution: '© OpenStreetMap', maxZoom: 19
+}).addTo(map);
+L.control.zoom({ position: 'topright' }).addTo(map);
+
+setTimeout(resizeMap, 100);
+map.whenReady(function() {
+  resizeMap();
+  setStatus('Escriu l\'indicatiu i prem "Afegir".');
+});
+
+let mode = 'none', patrols = [], movingId = null, activeModalId = null;
+
+function makeIcon(type, name, hasNotes) {
+  const color = COLORS[type] || '#185FA5';
+  const emoji = EMOJIS[type] || '?';
+  const label = emoji + ' ' + name;
+  const charW = 7.8, pad = 24;
+  const w = Math.max(80, label.length * charW + pad);
+  const anchorX = Math.round(w / 2);
+  const anchorY = 40;
+  const dot = hasNotes
+    ? '<span style="position:absolute;top:-5px;right:-5px;width:11px;height:11px;background:#e65c00;border-radius:50%;border:2px solid #fff;display:block;"></span>'
+    : '';
+  return L.divIcon({
+    className: '',
+    html: '<div style="text-align:center;display:inline-block;">'
+        + '<div style="position:relative;display:inline-block;background:' + color
+        + ';color:#fff;border-radius:18px;padding:5px 11px;font-size:13px;font-weight:bold;'
+        + 'white-space:nowrap;border:2px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,0.35);">'
+        + label + dot + '</div>'
+        + '<div style="width:0;height:0;border-left:8px solid transparent;border-right:8px solid transparent;border-top:10px solid '
+        + color + ';margin:0 auto;"></div></div>',
+    iconSize: [w, anchorY],
+    iconAnchor: [anchorX, anchorY],
+    popupAnchor: [0, -anchorY]
+  });
+}
+
+function activateAdd() {
+  const name = document.getElementById('patrol-name').value.trim();
+  if (!name) { setStatus('Escriu l\'indicatiu primer.'); return; }
+  mode = 'add'; movingId = null;
+  document.getElementById('btn-add').classList.add('active');
+  document.getElementById('btn-add').textContent = '? Toca el mapa...';
+  document.getElementById('btn-move').classList.remove('active');
+  document.getElementById('btn-move').textContent = '? Editar';
+  map.getContainer().style.cursor = 'crosshair';
+  setStatus('Toca el mapa per col·locar "' + name + '".');
+  document.getElementById('patrol-name').blur();
+}
+
+function activateMove() {
+  if (patrols.length === 0) { setStatus('No hi ha patrulles per editar.'); return; }
+  mode = 'move'; movingId = null;
+  document.getElementById('btn-move').classList.add('active');
+  document.getElementById('btn-move').textContent = '? Selecciona...';
+  document.getElementById('btn-add').classList.remove('active');
+  document.getElementById('btn-add').textContent = '+ Afegir';
+  map.getContainer().style.cursor = 'default';
+  setStatus('Toca la patrulla que vols moure, després toca el nou lloc.');
+}
+
+function cancelMode() {
+  mode = 'none'; movingId = null;
+  document.getElementById('btn-add').classList.remove('active');
+  document.getElementById('btn-add').textContent = '+ Afegir';
+  document.getElementById('btn-move').classList.remove('active');
+  document.getElementById('btn-move').textContent = '? Editar';
+  map.getContainer().style.cursor = '';
+  setStatus('Toca una patrulla per veure o editar les notes.');
+}
+
+map.on('click', function(e) {
+  if (mode === 'add') {
+    const name = document.getElementById('patrol-name').value.trim();
+    const type = document.getElementById('patrol-type').value;
+    if (!name) return;
+    addPatrol(e.latlng, name, type);
+    cancelMode();
+    document.getElementById('patrol-name').value = '';
+  } else if (mode === 'move' && movingId !== null) {
+    const p = patrols.find(function(x) { return x.id === movingId; });
+    if (p) { p.marker.setLatLng(e.latlng); setStatus('"' + p.name + '" reposicionada.'); }
+    cancelMode();
+  }
+});
+
+function addPatrol(latlng, name, type) {
+  const id = Date.now();
+  const marker = L.marker(latlng, { icon: makeIcon(type, name, false), draggable: false }).addTo(map);
+  patrols.push({ id: id, name: name, type: type, marker: marker, notes: '' });
+  marker.on('click', function(ev) {
+    L.DomEvent.stopPropagation(ev);
+    if (mode === 'move' && movingId === null) {
+      movingId = id;
+      map.getContainer().style.cursor = 'crosshair';
+      setStatus('"' + name + '" seleccionada. Toca el nou lloc del mapa.');
+      return;
+    }
+    if (mode === 'none') openModal(id);
+  });
+  updateList();
+  setStatus('"' + name + '" afegida.');
+}
+
+function openModal(id) {
+  const p = patrols.find(function(x) { return x.id === id; });
+  if (!p) return;
+  activeModalId = id;
+  document.getElementById('modal-title').textContent = EMOJIS[p.type] + ' ' + p.name;
+  document.getElementById('modal-subtitle').textContent = 'Tipus: ' + p.type + '  ·  Edita les notes i guarda';
+  document.getElementById('modal-notes').value = p.notes || '';
+  document.getElementById('modal-overlay').classList.add('visible');
+}
+
+function closeModal() {
+  document.getElementById('modal-overlay').classList.remove('visible');
+  activeModalId = null;
+}
+
+function closeModalOutside(e) {
+  if (e.target === document.getElementById('modal-overlay')) closeModal();
+}
+
+function saveNotes() {
+  const p = patrols.find(function(x) { return x.id === activeModalId; });
+  if (!p) return;
+  p.notes = document.getElementById('modal-notes').value;
+  p.marker.setIcon(makeIcon(p.type, p.name, p.notes.trim().length > 0));
+  closeModal(); updateList();
+  setStatus('Notes de "' + p.name + '" guardades.');
+}
+
+function deleteFromModal() {
+  const id = activeModalId; closeModal(); removePatrol(id);
+}
+
+function removePatrol(id) {
+  const idx = patrols.findIndex(function(p) { return p.id === id; });
+  if (idx === -1) return;
+  const name = patrols[idx].name;
+  map.removeLayer(patrols[idx].marker);
+  patrols.splice(idx, 1); updateList();
+  setStatus('"' + name + '" eliminada.');
+}
+
+function clearAll() {
+  if (patrols.length === 0) return;
+  if (!confirm('Eliminar totes les patrulles?')) return;
+  patrols.forEach(function(p) { map.removeLayer(p.marker); });
+  patrols = []; updateList(); setStatus('Mapa net.');
+}
+
+function focusPatrol(id) {
+  const p = patrols.find(function(x) { return x.id === id; });
+  if (!p) return;
+  map.setView(p.marker.getLatLng(), 16);
+  openModal(id);
+}
+
+function updateList() {
+  const row = document.getElementById('tags-row');
+  if (patrols.length === 0) {
+    row.innerHTML = '<span style="color:#bbb;font-size:11px;">Cap patrulla activa</span>';
+    return;
+  }
+  row.innerHTML = patrols.map(function(p) {
+    const note = p.notes && p.notes.trim() ? ' ?' : '';
+    return '<span class="patrol-tag" onclick="focusPatrol(' + p.id + ')">'
+      + EMOJIS[p.type] + ' ' + p.name + note + '</span>';
+  }).join('');
+}
+
+function setStatus(msg) { document.getElementById('status').textContent = msg; }
+
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape') {
+    if (document.getElementById('modal-overlay').classList.contains('visible')) closeModal();
+    else cancelMode();
+  }
+});
+
+// ===================== LOCALITZADOR GPS (estil Google Maps) =====================
+(function(){
+  const BEAM_SVG = '<svg class="me-beam" viewBox="0 0 120 120"><defs><radialGradient id="meg" cx="60" cy="60" r="56" gradientUnits="userSpaceOnUse">'
+    + '<stop offset="0" stop-color="#1a73e8" stop-opacity=".75"/><stop offset="1" stop-color="#1a73e8" stop-opacity="0"/></radialGradient></defs>'
+    + '<path d="M60 60 L32.5 12.4 A55 55 0 0 1 87.5 12.4 Z" fill="url(#meg)"/></svg>';
+  const meIcon = L.divIcon({ className:'', html:'<div class="me-wrap">' + BEAM_SVG + '<div class="me-dot"></div></div>', iconSize:[120,120], iconAnchor:[60,60] });
+  let on = false, follow = false, watchId = null, meMarker = null, accCircle = null, firstFix = true;
+  let compass = null, gpsHead = null, moving = false, lastFix = 0, wakeLock = null, btn = null;
+
+  const Ctl = L.Control.extend({
+    options: { position:'topright' },
+    onAdd: function(){
+      const div = L.DomUtil.create('div', 'leaflet-bar gps-ctl');
+      btn = L.DomUtil.create('a', '', div); btn.href = '#'; btn.title = 'La meva ubicació'; btn.innerHTML = '&#9678;';
+      L.DomEvent.disableClickPropagation(div);
+      L.DomEvent.on(btn, 'click', function(e){ L.DomEvent.preventDefault(e); toggle(); });
+      return div;
+    }
+  });
+  map.addControl(new Ctl());
+  map.on('dragstart', function(){ if (follow){ follow = false; paintBtn(); } });
+
+  function paintBtn(){ btn.className = on ? (follow ? 'follow' : 'on') : ''; }
+
+  function toggle(){
+    if (!on){
+      if (!('geolocation' in navigator)){ setStatus('Aquest navegador no dona la ubicació.'); return; }
+      on = true; follow = true; firstFix = true; paintBtn();
+      setStatus('Buscant la teva posició GPS...');
+      watchId = navigator.geolocation.watchPosition(onPos, onErr, { enableHighAccuracy:true, maximumAge:1000, timeout:20000 });
+      startCompass(); keepAwake();
+    } else if (!follow){
+      follow = true; paintBtn();
+      if (meMarker) map.setView(meMarker.getLatLng(), Math.max(map.getZoom(), 17));
+    } else {
+      navigator.geolocation.clearWatch(watchId); on = false; follow = false; paintBtn();
+      if (meMarker){ map.removeLayer(meMarker); meMarker = null; }
+      if (accCircle){ map.removeLayer(accCircle); accCircle = null; }
+      try { if (wakeLock) wakeLock.release(); } catch(e){}
+      setStatus('Localització desactivada.');
+    }
+  }
+
+  function onPos(p){
+    const ll = L.latLng(p.coords.latitude, p.coords.longitude), acc = p.coords.accuracy;
+    const hd = p.coords.heading, sp = p.coords.speed;
+    moving = (sp !== null && sp > 1.5 && hd !== null && !isNaN(hd));
+    gpsHead = moving ? hd : null; lastFix = Date.now();
+    if (!meMarker){
+      accCircle = L.circle(ll, { radius:acc, color:'#1a73e8', weight:1, opacity:.4, fillColor:'#1a73e8', fillOpacity:.12, interactive:false }).addTo(map);
+      meMarker = L.marker(ll, { icon:meIcon, interactive:false, keyboard:false, zIndexOffset:1000 }).addTo(map);
+    } else { meMarker.setLatLng(ll); accCircle.setLatLng(ll); accCircle.setRadius(acc); }
+    const dot = meMarker.getElement() && meMarker.getElement().querySelector('.me-dot'); if (dot) dot.classList.remove('stale');
+    if (follow){ if (firstFix){ map.setView(ll, Math.max(map.getZoom(), 17)); firstFix = false; } else map.panTo(ll, { animate:true, duration:0.6 }); }
+    updBeam();
+    setStatus('Ubicació activa · precisió ±' + Math.round(acc) + ' m' + (moving ? ' · ' + Math.round(sp * 3.6) + ' km/h' : ''));
+  }
+  function onErr(e){
+    if (e.code === 1){ setStatus('Permís d\'ubicació denegat. Activa\'l al cadenat de la barra d\'adreces ? Ubicació.'); on = false; follow = false; paintBtn(); }
+    else if (e.code === 3) setStatus('El GPS triga a respondre, continuo provant...');
+    else setStatus('No s\'ha pogut obtenir la ubicació.');
+  }
+  // si fa més de 30 s sense posició, punt gris (com Google)
+  setInterval(function(){ if (meMarker && Date.now() - lastFix > 30000){ const d = meMarker.getElement().querySelector('.me-dot'); if (d) d.classList.add('stale'); } }, 5000);
+
+  // ---- brúixola
+  function screenAngle(){ try { return (screen.orientation && screen.orientation.angle) || window.orientation || 0; } catch(e){ return 0; } }
+  function onOrient(e){
+    let h = null;
+    if (typeof e.webkitCompassHeading === 'number') h = e.webkitCompassHeading;
+    else if (e.absolute && e.alpha !== null) h = 360 - e.alpha;
+    if (h === null) return;
+    h = (h + screenAngle() + 360) % 360;
+    if (compass === null) compass = h; else { const d = ((h - compass + 540) % 360) - 180; compass = (compass + d * 0.25 + 360) % 360; }
+    updBeam();
+  }
+  let orientOn = false;
+  function startCompass(){
+    if (orientOn) return; orientOn = true;
+    try {
+      if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function'){
+        DeviceOrientationEvent.requestPermission().then(function(r){ if (r === 'granted') window.addEventListener('deviceorientation', onOrient); }).catch(function(){});
+      } else if ('ondeviceorientationabsolute' in window) window.addEventListener('deviceorientationabsolute', onOrient);
+      else window.addEventListener('deviceorientation', onOrient);
+    } catch(e){}
+  }
+  let beamDeg = null;
+  function updBeam(){
+    if (!meMarker || !meMarker.getElement()) return;
+    const beam = meMarker.getElement().querySelector('.me-beam');
+    const h = moving ? gpsHead : compass;
+    if (h === null){ beam.style.display = 'none'; return; }
+    // girar pel camí més curt
+    if (beamDeg === null) beamDeg = h; else beamDeg += ((h - beamDeg % 360 + 540) % 360) - 180;
+    beam.style.display = 'block'; beam.style.transform = 'rotate(' + beamDeg + 'deg)';
+  }
+  async function keepAwake(){ try { if ('wakeLock' in navigator) wakeLock = await navigator.wakeLock.request('screen'); } catch(e){} }
+  document.addEventListener('visibilitychange', function(){ if (on && document.visibilityState === 'visible') keepAwake(); });
+  window._gpsDebug = { onOrient:onOrient, get compass(){ return compass; } };
+})();
+</script>
+</body>
+</html>
